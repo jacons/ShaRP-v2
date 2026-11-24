@@ -10,8 +10,8 @@ from sharp.tests.make_golden import DATASETS
 
 def test_cache_no_collision_on_close_floats():
     w = TargetFunctionWrapper(lambda X: X.astype(float).sum(axis=1))
-    a = np.array([[1.000000001, 0.0]], dtype=object)
-    b_ = np.array([[1.000000002, 0.0]], dtype=object)
+    a = np.array([[1.000000001, 0.0]])
+    b_ = np.array([[1.000000002, 0.0]])
     assert w(a)[0] != w(b_)[0]
 
 
