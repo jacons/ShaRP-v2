@@ -2,6 +2,7 @@
 Base object used to set up explainability objects.
 """
 
+import numbers
 import numpy as np
 from itertools import product
 from sklearn.base import BaseEstimator
@@ -213,8 +214,10 @@ class ShaRP(BaseEstimator):
         else:
             coalition_size = X_.shape[-1] - 1
 
-        if isinstance(sample, int):
+        if isinstance(sample, numbers.Integral):
             sample = X_[sample]
+        else:
+            sample = np.asarray(sample)
 
         if "sample_size" in kwargs.keys():
             sample_size = kwargs["sample_size"]
@@ -242,7 +245,7 @@ class ShaRP(BaseEstimator):
             progress_bar=verbosity,
         )
 
-        return influences
+        return np.asarray(influences)
 
     def feature(self, feature, X=None, y=None, **kwargs):
         """
@@ -271,10 +274,13 @@ class ShaRP(BaseEstimator):
         float
             Average contributions of a specific feature along all sample points.
         """
+        if X is None:
+            X = self.qoi_.X
+
         X_, y_ = check_inputs(X, y)
 
         col_idx = (
-            self.feature_names_.index(feature) if type(feature) is str else feature
+            list(self.feature_names_).index(feature) if type(feature) is str else feature
         )
 
         if "set_cols_idx" in kwargs.keys():
@@ -420,7 +426,7 @@ class ShaRP(BaseEstimator):
             Contributions of each feature to each `sample1` point's qoi
         """
         if "X" in kwargs.keys():
-            X = kwargs["X"]
+            X = kwargs.pop("X")
 
             if type(sample1) in [int, list]:
                 sample1 = X[sample1]
@@ -428,6 +434,8 @@ class ShaRP(BaseEstimator):
             if type(sample2) in [int, list]:
                 sample2 = X[sample2]
 
+        sample1 = np.asarray(sample1)
+        sample2 = np.asarray(sample2)
         sample2 = sample2.reshape(1, -1) if sample2.ndim == 1 else sample2
 
         if "sample_size" in kwargs.keys():
