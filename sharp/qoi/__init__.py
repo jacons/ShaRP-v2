@@ -3,9 +3,6 @@ Quantities of interest.
 """
 
 from ._qoi import (
-    DiffQoI,
-    FlipQoI,
-    LikelihoodQoI,
     RankQoI,
     RankScoreQoI,
     TopKQoI,
@@ -14,9 +11,6 @@ from ._qoi import (
 )
 
 __all__ = [
-    "DiffQoI",
-    "FlipQoI",
-    "LikelihoodQoI",
     "RankQoI",
     "RankScoreQoI",
     "TopKQoI",

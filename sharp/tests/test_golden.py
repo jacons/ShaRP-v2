@@ -21,4 +21,4 @@ def test_datasets():
 @pytest.mark.parametrize("case", CASES, ids=[c["id"] for c in CASES])
 def test_golden(case):
     for key, val in run_case(sharp, case, **EXTRA).items():
-        assert_array_equal(GOLDEN[f"{case['id']}/{key}"], val, err_msg=key)
+        assert_array_equal(GOLDEN[f"{case['id']}/{key}"], val, err_msg=key, strict=True)

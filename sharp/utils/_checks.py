@@ -72,13 +72,6 @@ def check_qoi(qoi, target_function=None, X=None, cache=True, **kwargs):
             msg = "If `qoi` is `str` and rank-based, `X` cannot be None."
             raise TypeError(msg)
 
-    elif qoi is None:
-        qoi = "qoi"
-
-        if target_function is None:
-            msg = "If `qoi` is `None`, `target_function` cannot be None."
-            raise TypeError(msg)
-
     else:
         define_qoi = False
 

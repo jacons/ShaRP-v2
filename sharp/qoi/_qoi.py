@@ -2,85 +2,6 @@ import copy
 from .base import BaseQoI, BaseRankQoI
 
 
-class DiffQoI(BaseQoI):
-    """
-    A general QoI, suitable for models/methods that output label predictions or scores.
-    ``target_function`` can output either scores or binary labels.
-
-    Parameters
-    ----------
-    target_function : function
-        Method used to predict a label or score. The output of this function
-        should be a 1-dimensional array with the expected target (i.e., label or score)
-        for each of the passed observations.
-
-    Notes
-    -----
-    This QoI was formerly defined as just ``QoI``.
-    """
-
-    def _estimate(self, rows):
-        return self.target_function(rows)
-
-    def _calculate(self, rows1, rows2):
-        return (self.estimate(rows1) - self.estimate(rows2)).mean()
-
-
-class FlipQoI(BaseQoI):
-    """
-    Implements equation 4 from [1]_. This QoI is designed for classification, using label
-    predictions. Although it was originally intended for binary classification,
-    multiclass problems may be quantified directly using this QoI. This QoI's influence
-    score quantifies how "pivotal" a given feature is. ``target_function`` should output
-    class predictions.
-
-    References
-    ----------
-    .. [1] Datta, A., Sen, S., & Zick, Y. (2016). Algorithmic transparency via
-        quantitative input influence: Theory and experiments with learning systems. In
-        2016 IEEE symposium on security and privacy (SP) (pp. 598-617). IEEE.
-
-    Notes
-    -----
-    This QoI was formerly defined as ``BCFlipped``.
-    """
-
-    def _estimate(self, rows):
-        return self.target_function(rows)
-
-    def _calculate(self, rows1, rows2):
-        y_pred1 = self.estimate(rows1)
-        y_pred2 = self.estimate(rows2)
-        return 1 - (y_pred2 == y_pred1).mean()
-
-
-class LikelihoodQoI(BaseQoI):
-    """
-    Implements equation 3 from [1]_. This QoI is designed for binary classification
-    problems only.  It calculates the difference between the likelihoods for ``rows1``
-    and ``rows2`` to obtain the positive label. ``target_function`` should output either
-    scores or class label predictions.
-
-    References
-    ----------
-    .. [1] Datta, A., Sen, S., & Zick, Y. (2016). Algorithmic transparency via
-        quantitative input influence: Theory and experiments with learning systems. In
-        2016 IEEE symposium on security and privacy (SP) (pp. 598-617). IEEE.
-
-    Notes
-    -----
-    This QoI was formerly defined as ``BCLikelihood``.
-    """
-
-    def _estimate(self, rows):
-        y_pred = self.target_function(rows)  # .squeeze()
-        y_pred_mean = (y_pred if y_pred.ndim == 1 else y_pred[:, -1]).mean()
-        return y_pred_mean
-
-    def _calculate(self, rows1, rows2):
-        return self.estimate(rows1) - self.estimate(rows2)  # .mean()
-
-
 class RankQoI(BaseRankQoI):
     """
     Rank specific QoI. Uses rank as the quantity being measured. The influence score
@@ -101,7 +22,7 @@ class RankQoI(BaseRankQoI):
 
 class RankScoreQoI(BaseRankQoI):
     """
-    A general, ranking-oriented QoI, similar to ``DiffQoI``. ``target_function`` must
+    A general, ranking-oriented QoI, ``target_function`` must
     output scores.
 
     Notes
@@ -140,9 +61,6 @@ class TopKQoI(BaseRankQoI):
 
 
 _QOI_OBJECTS = {
-    "diff": DiffQoI,
-    "flip": FlipQoI,
-    "likelihood": LikelihoodQoI,
     "rank": RankQoI,
     "rank_score": RankScoreQoI,
     "top_k": TopKQoI,
@@ -166,10 +84,8 @@ def get_qoi_names():
     >>> all_qois = get_qoi_names()
     >>> type(all_qois)
     <class 'list'>
-    >>> all_qois[:3]
-    ['diff', 'flip', 'likelihood']
-    >>> "ranking" in all_qois
-    True
+    >>> all_qois
+    ['rank', 'rank_score', 'top_k']
     """
     return sorted(_QOI_OBJECTS.keys())
 

@@ -13,7 +13,6 @@ from .utils import (
     check_measure,
     check_qoi,
 )
-from .visualization._visualization import ShaRPViz
 
 
 class ShaRP(BaseEstimator):
@@ -62,11 +61,8 @@ class ShaRP(BaseEstimator):
         Ignored if `qoi` is specified.
 
     measure : str, default="shapley"
-        The method used to compute feature contributions. Options include:
-        - "set"
-        - "marginal"
-        - "shapley"
-        - "banzhaff"
+        The method used to compute feature contributions. Options include
+        "shapley", None (same as "shapley") or a callable.
 
     sample_size : int, optional
         The number of perturbations to apply per data point when calculating
@@ -128,7 +124,6 @@ class ShaRP(BaseEstimator):
         self.cache = cache
         self.n_jobs = n_jobs
         self.verbose = verbose
-        self.plot = ShaRPViz(self)
 
         if "X" in kwargs.keys():
             self._X = kwargs["X"]
@@ -178,7 +173,6 @@ class ShaRP(BaseEstimator):
         """
         Provides an explanation for individual sample point based on reference dataset
 
-        .. note:: set_cols_idx should be passed in kwargs if measure is marginal
 
         Parameters
         ----------
@@ -255,7 +249,6 @@ class ShaRP(BaseEstimator):
         Provides an explanation for all sample points for a specified feature
         based on reference dataset
 
-        .. note:: set_cols_idx should be passed in kwargs if measure is marginal
 
         Parameters
         ----------
@@ -325,7 +318,6 @@ class ShaRP(BaseEstimator):
         """
         Provides an explanation for all sample points based on reference dataset
 
-        .. note:: set_cols_idx should be passed in kwargs if measure is marginal
 
         Parameters
         ----------
@@ -403,7 +395,6 @@ class ShaRP(BaseEstimator):
         If `sample1` or `sample2` are of type `int` or `list`, `X` also needs
         to be passed.
 
-        .. note:: set_cols_idx should be passed in kwargs if measure is marginal
 
         Parameters
         ----------
@@ -471,7 +462,6 @@ class ShaRP(BaseEstimator):
 
         .. note:: if elements of `samples1` or `samples2` are of type `int` or `list`,
             `X` also needs to be passed.
-        .. note:: set_cols_idx should be passed in kwargs if measure is marginal
 
         Parameters
         ----------

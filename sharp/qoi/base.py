@@ -128,9 +128,9 @@ class BaseRankQoI(BaseQoI, metaclass=ABCMeta):
         self._X_sorted = True
         return self
 
-    def rank(self, X, X_base=None):
+    def rank(self, X):
         """
-        Computes the ranking of samples ``X`` within a dataset ``X_base``.
+        Computes the ranking of samples ``X`` within the reference dataset ``self.X``.
 
         Parameters
         ----------
@@ -142,36 +142,17 @@ class BaseRankQoI(BaseQoI, metaclass=ABCMeta):
         rankings : np.ndarray of shape (n_samples,)
             Rankings for all samples in ``X``.
         """
-
-        # Retrieve reference dataset and calculate scores to get rankings for
-        if X_base is None and self.X is None:
-            msg = (
-                "Either ``self.X`` (defined in the object initialization) or ``X_base`` "
-                "(a paremeter from the ``rank`` method) must be defined."
+        if self.X is None:
+            raise ValueError(
+                "``self.X`` must be defined (in the object initialization)."
             )
-            raise ValueError(msg)
-        elif X_base is None:
-            if not self._X_sorted:
-                self.sort_base()
 
-            if not hasattr(self, "_scores_base"):
-                self._scores_base = self.target_function(self.X)
+        if not self._X_sorted:
+            self.sort_base()
 
-            X_base = self.X
-            scores_base = self._scores_base
+        if not hasattr(self, "_scores_base"):
+            self._scores_base = self.target_function(self.X)
 
-            scores = self.target_function(X)
-            ranks_all = scores_base.shape[0] - np.searchsorted(
-                scores_base, scores, side="left"
-            )
-            return ranks_all
-        else:
-            scores_base = self.target_function(X_base)
-
-            ranks_all = []
-            for row in X:
-                score = self.target_function(row.reshape(1, -1))[0]
-                rank = (scores_base > score).sum() + 1
-                ranks_all.append(rank)
-
-            return np.array(ranks_all)
+        scores_base = self._scores_base
+        scores = self.target_function(X)
+        return scores_base.shape[0] - np.searchsorted(scores_base, scores, side="left")

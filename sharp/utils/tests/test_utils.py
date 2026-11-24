@@ -1,5 +1,5 @@
 import pytest
-from sharp.utils._utils import _optional_import
+from sharp.utils._parallelize import _optional_import
 
 
 def test_optional_import_existing_module():

@@ -3,7 +3,7 @@ from itertools import product
 import numpy as np
 from sklearn.utils import check_random_state
 from sharp.qoi import get_qoi
-from sharp.utils import scores_to_ordering
+from scipy.stats import rankdata
 
 # Set up some envrionment variables
 RNG_SEED = 123
@@ -19,9 +19,9 @@ X = np.concatenate(
     [rng.normal(size=(N_SAMPLES, 1)), rng.binomial(1, 0.5, size=(N_SAMPLES, 1))], axis=1
 )
 y = score_function(X)
-rank = scores_to_ordering(y)
+rank = rankdata(-y, method="ordinal").astype(int)
 
-qois_str = ["rank", "rank_score", "top_k", "diff", "flip", "likelihood"]
+qois_str = ["rank", "rank_score", "top_k"]
 qois_obj = [get_qoi(qoi) for qoi in qois_str]
 
 pairs1 = rng.randint(0, X.shape[0], size=3)
@@ -46,8 +46,6 @@ def test_qoi_estimation(qoi_str):
         assert (qoi.estimate(rows=X) == rank).all()
     elif qoi_str == "top_k":
         assert (qoi.estimate(rows=X) == (rank <= 10).astype(int)).all()
-    elif qoi_str == "likelihood":
-        assert qoi.estimate(rows=X).item() == y.mean()
     else:
         np.testing.assert_allclose(qoi.estimate(rows=X), y, atol=1e-7)
 
@@ -69,10 +67,6 @@ def test_qoi_calculation(qoi_str, item_idx1, item_idx2):
         assert qoi.calculate(rows1=item1, rows2=item2).item() == (
             (rank[item_idx1] <= 10).astype(int) - (rank[item_idx2] <= 10).astype(int)
         )
-    elif qoi_str == "flip":
-        assert qoi.calculate(rows1=item1, rows2=item2).item() == (
-            y[item_idx1] != y[item_idx2]
-        ).astype(int)
     else:
         np.testing.assert_allclose(
             qoi.calculate(rows1=item1, rows2=item2),
