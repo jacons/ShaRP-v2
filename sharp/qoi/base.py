@@ -1,27 +1,28 @@
 from abc import ABCMeta, abstractmethod
 import numpy as np
 from sklearn.base import BaseEstimator
-from multiprocessing import Manager
 
 
 class TargetFunctionWrapper:
+    """Exact in-process cache keyed by row values; one model call per batch."""
 
     def __init__(self, target_function):
         self.target_function = target_function
-        self._hashmap = Manager().dict()
-
-    def _check_hash(self, row):
-        row_str = str(row)
-        try:
-            return self._hashmap[row_str]
-        except KeyError:
-            pred = self.target_function(row)
-            self._hashmap[row_str] = pred
-            return pred
+        self._cache = {}
+        self._dtype = None
 
     def __call__(self, rows):
-        results = [self._check_hash(row.reshape(1, -1)) for row in rows]
-        return np.array(results).reshape(-1)
+        rows = np.asarray(rows)
+        keys = [tuple(r.tolist()) for r in rows]
+        new = {}  # first index of each uncached key, in order
+        for i, k in enumerate(keys):
+            if k not in self._cache:
+                new.setdefault(k, i)
+        if new:
+            out = np.asarray(self.target_function(rows[list(new.values())]))
+            self._dtype = out.dtype
+            self._cache.update(zip(new, out.reshape(-1)))
+        return np.array([self._cache[k] for k in keys], dtype=self._dtype)
 
 
 class BaseQoI(BaseEstimator, metaclass=ABCMeta):
