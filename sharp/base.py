@@ -121,11 +121,11 @@ class ShaRP(BaseEstimator):
         sample_size=None,
         coalition_size=None,
         replace=False,
-        semantics="paper",
         random_state=None,
         cache=True,
         n_jobs=1,
         verbose=0,
+        semantics="paper",
         **kwargs
     ):
         self.qoi = qoi

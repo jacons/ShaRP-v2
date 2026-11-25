@@ -74,3 +74,9 @@ def test_all_default_X():
     X, f = DATASETS["gauss3"]
     xai = _fit(f, X, sample_size=None)
     np.testing.assert_allclose(xai.all(), xai.all(X))
+
+
+def test_positional_signature_unchanged():
+    X, f = DATASETS["gauss3"]
+    xai = ShaRP("rank", f, "shapley", None, None, False, 0)
+    assert xai.random_state == 0 and xai.semantics == "paper"
