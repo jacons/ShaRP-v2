@@ -1,8 +1,7 @@
 from pathlib import Path
 from setuptools import find_packages, setup
 
-with open("sharp/_version.py") as f:
-    exec(f.read())
+exec((Path(__file__).parent / "sharp" / "_version.py").read_text(encoding="utf8"))
 
 MAINTAINER = "J. Fonseca"
 MAINTAINER_EMAIL = "jpfonseca@novaims.unl.pt"
@@ -35,7 +34,7 @@ setup(
     long_description_content_type="text/markdown",
     license="MIT",
     classifiers=CLASSIFIERS,
-    packages=find_packages(),
+    packages=find_packages(exclude=["*.tests", "*.tests.*"]),
     python_requires=">=3.10",
-    install_requires=["numpy>=1.20.0", "scikit-learn>=1.2.0", "tqdm>=4.46.0"],
+    install_requires=["numpy>=1.24", "scikit-learn>=1.2.0", "tqdm>=4.46.0"],
 )
