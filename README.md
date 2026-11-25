@@ -69,7 +69,9 @@ the ``fit`` data and from ``X_other``, if present in them.
 
 Under ``paper``, ``sample_size=None`` means the whole pool after the removal;
 a ``sample_size`` larger than the pool, without ``replace``, is capped at the
-pool size. ``coalition_size`` smaller than ``n_features - 1`` is an
+pool size. If removing v would leave the pool empty (v is the only donor), v is
+kept, so the contributions are zero. In ``all`` the donors are the ``X`` passed to
+it, like in ``individual``. ``coalition_size`` smaller than ``n_features - 1`` is an
 approximation: weights are not renormalized, so efficiency does not hold.
 
 ## Citing ShaRP

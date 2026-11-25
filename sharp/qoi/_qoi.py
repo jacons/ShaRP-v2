@@ -114,7 +114,7 @@ def get_qoi(qoi):
 
     Notes
     -----
-    When passed a string, this function returns a copy of the QoI class
+    When passed a string, this function returns the QoI class
     (not an instance), so it can be instantiated with the QoI's parameters.
     """
     if isinstance(qoi, str):
