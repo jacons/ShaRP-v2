@@ -14,7 +14,7 @@ class RankQoI(BaseRankQoI):
     """
 
     def _estimate(self, rows, exclude=None):
-        return self.rank(rows)
+        return self.rank(rows, exclude)
 
     def _calculate(self, rows1, rows2, exclude=None):
         return (self.estimate(rows2, exclude) - self.estimate(rows1, exclude)).mean()
@@ -57,7 +57,7 @@ class TopKQoI(BaseRankQoI):
         self.top_k = top_k
 
     def _estimate(self, rows, exclude=None):
-        ranks = self.rank(rows)
+        ranks = self.rank(rows, exclude)
         return (ranks <= self.top_k).astype(int)
 
     def _calculate(self, rows1, rows2, exclude=None):

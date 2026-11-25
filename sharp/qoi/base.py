@@ -133,7 +133,7 @@ class BaseRankQoI(BaseQoI, metaclass=ABCMeta):
         self._X_sorted = True
         return self
 
-    def rank(self, X):
+    def rank(self, X, exclude=None):
         """
         Computes the ranking of samples ``X`` within the reference dataset ``self.X``.
 
@@ -157,4 +157,17 @@ class BaseRankQoI(BaseQoI, metaclass=ABCMeta):
 
         scores_base = self._scores_sorted
         scores = self.target_function(X)
-        return scores_base.shape[0] - np.searchsorted(scores_base, scores, side="left")
+        if self.semantics == "legacy":
+            return scores_base.shape[0] - np.searchsorted(
+                scores_base, scores, side="left"
+            )
+        # paper: competition ranks against D minus the explained item
+        ranks = 1 + scores_base.shape[0] - np.searchsorted(
+            scores_base, scores, side="right"
+        )
+        if exclude is not None and (np.asarray(self.X) == np.asarray(exclude)).all(
+            axis=1
+        ).any():
+            s_ex = self.target_function(np.asarray(exclude)[None, :])[0]
+            ranks = ranks - (s_ex > scores)
+        return ranks

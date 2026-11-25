@@ -13,6 +13,8 @@ def _drop_first_equal(X, v):
 
 
 def exact_shapley(f, X_rank, X_donors, v, qoi, top_k=None):
+    assert qoi in ("score", "rank", "top_k")
+    assert qoi != "top_k" or top_k is not None
     X_rank = np.asarray(X_rank, dtype=float)
     X_donors = np.asarray(X_donors, dtype=float)
     v = np.asarray(v, dtype=float)
