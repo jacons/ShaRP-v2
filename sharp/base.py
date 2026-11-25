@@ -202,12 +202,15 @@ class ShaRP(BaseEstimator):
         return pool, row, sample_size
 
     def _task_rngs(self, n_tasks, seed=None):
-        """One rng per task: the shared one (legacy) or independent seeded ones (paper)."""
+        """Task -> rng: the shared one (legacy) or a seeded one (paper).
+
+        Only int seeds are held, so closures stay cheap to ship to workers.
+        """
         if self.semantics == "legacy":
-            return [self._rng] * n_tasks
+            return lambda t: self._rng
         rng = self._rng if seed is None else np.random.RandomState(seed)
         seeds = rng.randint(np.iinfo(np.int32).max, size=n_tasks)
-        return [np.random.RandomState(s) for s in seeds]
+        return lambda t: np.random.RandomState(seeds[t])
 
     def individual(self, sample, X=None, y=None, **kwargs):
         """
@@ -275,7 +278,7 @@ class ShaRP(BaseEstimator):
                 sample_size=sample_size,
                 coalition_size=coalition_size,
                 replace=self.replace,
-                rng=rngs[col_idx],
+                rng=rngs(col_idx),
                 exclude=exclude,
             ),
             range(n_features),
@@ -351,7 +354,7 @@ class ShaRP(BaseEstimator):
                 sample_size=sample_size,
                 coalition_size=coalition_size,
                 replace=self.replace,
-                rng=rngs[sample_idx],
+                rng=rngs(sample_idx),
                 exclude=exclude,
             )
             influences.append(cell_influence)
@@ -426,7 +429,7 @@ class ShaRP(BaseEstimator):
                     sample_size=sample_size,
                     coalition_size=coalition_size,
                     replace=self.replace,
-                    rng=rngs[task],
+                    rng=rngs(task),
                     exclude=exclude,
                 ),
             )
