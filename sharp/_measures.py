@@ -55,7 +55,8 @@ def _marginal(
     X_modded2[:, col_idx] = X_sampled[:, col_idx]
 
     # Return score
-    return qoi.calculate(X_modded1, X_modded2, exclude=exclude)
+    kw = {} if exclude is None else {"exclude": exclude}
+    return qoi.calculate(X_modded1, X_modded2, **kw)
 
 
 def _shapley(
@@ -113,7 +114,7 @@ def _shapley(
             sample_size=sample_size,
             replace=replace,
             rng=rng,
-            exclude=exclude,
+            **({} if exclude is None else {"exclude": exclude}),
         )
         total_score += score / (comb(X.shape[1] - 1, len(set_cols_idx)) * X.shape[1])
 

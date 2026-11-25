@@ -4,7 +4,11 @@ from sklearn.base import BaseEstimator
 
 
 class TargetFunctionWrapper:
-    """Exact in-process cache keyed by row values; one model call per batch."""
+    """Exact in-process cache keyed by row values; one model call per batch.
+
+    Rows containing NaN never hit the cache (NaN != NaN as a dict key), so they are
+    recomputed each time; values stay correct.
+    """
 
     def __init__(self, target_function):
         self.target_function = target_function
@@ -19,7 +23,13 @@ class TargetFunctionWrapper:
             if k not in self._cache:
                 new.setdefault(k, i)
         if new:
-            out = np.asarray(self.target_function(rows[list(new.values())]))
+            sub = rows[list(new.values())]
+            out = np.asarray(self.target_function(sub))
+            if out.size != len(sub):
+                raise ValueError(
+                    f"target_function returned {out.size} values for {len(sub)} "
+                    "rows; expected one score per row."
+                )
             self._dtype = out.dtype
             self._cache.update(zip(new, out.reshape(-1)))
         return np.array([self._cache[k] for k in keys], dtype=self._dtype)
@@ -27,7 +37,9 @@ class TargetFunctionWrapper:
 
 class BaseQoI(BaseEstimator, metaclass=ABCMeta):
     """
-    Base class to implement Quantities of Interest (QoI). It should not be used directly. Any QoI must define at least 2 functions:
+    Base class to implement Quantities of Interest (QoI).
+
+    It should not be used directly. Any QoI must define at least 2 functions:
 
       :func:`qoi.estimate`:
           A function that predicts the model's result for one or multiple items.
@@ -80,7 +92,7 @@ class BaseQoI(BaseEstimator, metaclass=ABCMeta):
         target_output : np.ndarray of shape (n_samples,)
             Score or rank estimations.
         """
-        return self._estimate(rows, exclude)
+        return self._estimate(rows, **({} if exclude is None else {"exclude": exclude}))
 
     def calculate(self, rows1, rows2, exclude=None):
         """
@@ -103,7 +115,8 @@ class BaseQoI(BaseEstimator, metaclass=ABCMeta):
         influence_score : float
             Influence score for ``rows1``, compared to ``rows2``.
         """
-        return self._calculate(rows1, rows2, exclude)
+        kw = {} if exclude is None else {"exclude": exclude}
+        return self._calculate(rows1, rows2, **kw)
 
     @abstractmethod
     def _estimate(self, rows, exclude=None):
@@ -146,6 +159,7 @@ class BaseRankQoI(BaseQoI, metaclass=ABCMeta):
             self.X = self.X[idx_sorted]
         self._scores_sorted = scores[idx_sorted]
         self._X_sorted = True
+        self._s_ex = {}
         return self
 
     def rank(self, X, exclude=None):
@@ -189,9 +203,18 @@ class BaseRankQoI(BaseQoI, metaclass=ABCMeta):
         ranks = 1 + scores_base.shape[0] - np.searchsorted(
             scores_base, scores, side="right"
         )
-        if exclude is not None and (np.asarray(self.X) == np.asarray(exclude)).all(
-            axis=1
-        ).any():
-            s_ex = self.target_function(np.asarray(exclude)[None, :])[0]
-            ranks = ranks - (s_ex > scores)
+        if exclude is not None:
+            s_ex = self._excluded_score(np.asarray(exclude))
+            if s_ex is not None:
+                ranks = ranks - (s_ex > scores)
         return ranks
+
+    def _excluded_score(self, exclude):
+        """f(exclude) if ``exclude`` is a row of ``self.X`` else None (memoized)."""
+        key = tuple(exclude.tolist())
+        if key not in self._s_ex:
+            in_X = (np.asarray(self.X) == exclude).all(axis=1).any()
+            self._s_ex[key] = (
+                self.target_function(exclude[None, :])[0] if in_X else None
+            )
+        return self._s_ex[key]

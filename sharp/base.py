@@ -22,6 +22,11 @@ def _drop_row(X, row):
     return np.delete(X, match.argmax(), axis=0) if match.any() else X
 
 
+def _exclude_kw(exclude):
+    """``exclude`` is only forwarded when set, so legacy measures need not accept it."""
+    return {} if exclude is None else {"exclude": exclude}
+
+
 class ShaRP(BaseEstimator):
     """
     The ShaRP (Shapley for Rankings and Preferences) class provides a novel framework
@@ -175,6 +180,10 @@ class ShaRP(BaseEstimator):
             Target variable.
         feature_names: array-like, shape (n_features,), default=None
             Names of features in X.
+
+        Returns
+        -------
+        self
         """
         if self.semantics not in ("paper", "legacy"):
             raise ValueError(
@@ -202,12 +211,15 @@ class ShaRP(BaseEstimator):
         self.feature_names_ = check_feature_names(X, feature_names=feature_names)
 
         self.measure_ = check_measure(self.measure)
+        return self
 
     def _donors(self, pool, row, sample_size, n_default):
         """Donor pool, row to exclude from rank references, and sample size."""
         if self.semantics == "legacy":
             return pool, None, n_default if sample_size is None else sample_size
-        pool = _drop_row(pool, row)
+        dropped = _drop_row(pool, row)
+        if len(dropped):  # never leave the pool empty: keep v if it is the only donor
+            pool = dropped
         if sample_size is None:
             sample_size = len(pool)
         elif not self.replace:
@@ -243,8 +255,10 @@ class ShaRP(BaseEstimator):
             feature importance.
         coalition_size : int, default=n_features-1
             Maximum number of features used during the construction of composite points.
-        sample_size : int, default=n_samples
+        sample_size : int, default=None
             Maximum number of samples used during the construction of composite points.
+            Default: ``self.sample_size``; if that is None, all donors (under
+            ``semantics="paper"``, the pool after excluding the explained item).
 
         Returns
         -------
@@ -271,7 +285,7 @@ class ShaRP(BaseEstimator):
         if isinstance(sample, numbers.Integral):
             sample = X_[sample]
         else:
-            sample = np.asarray(sample)
+            sample = np.asarray(sample).reshape(-1)
 
         sample_size = kwargs.get("sample_size", self.sample_size)
         pool, exclude, sample_size = self._donors(X_, sample, sample_size, X_.shape[0])
@@ -291,7 +305,7 @@ class ShaRP(BaseEstimator):
                 coalition_size=coalition_size,
                 replace=self.replace,
                 rng=rngs(col_idx),
-                exclude=exclude,
+                **_exclude_kw(exclude),
             ),
             range(n_features),
             n_jobs=n_jobs,
@@ -318,8 +332,10 @@ class ShaRP(BaseEstimator):
             feature importance.
         coalition_size : int, default=n_features-1
             Maximum number of features used during the construction of composite points.
-        sample_size : int, default=n_samples
+        sample_size : int, default=None
             Maximum number of samples used during the construction of composite points.
+            Default: ``self.sample_size``; if that is None, all donors (under
+            ``semantics="paper"``, the pool after excluding the explained item).
 
         Returns
         -------
@@ -366,7 +382,7 @@ class ShaRP(BaseEstimator):
                 coalition_size=coalition_size,
                 replace=self.replace,
                 rng=rngs(sample_idx),
-                exclude=exclude,
+                **_exclude_kw(exclude),
             )
             influences.append(cell_influence)
 
@@ -378,10 +394,10 @@ class ShaRP(BaseEstimator):
 
         Parameters
         ----------
-        feature : str or int
-            Name or index of the targeted feature
         X : array-like, shape (n_samples, n_features), default=None
-            Reference dataset used to compute explanations.
+            Dataset to explain. Under ``semantics="paper"`` it is also the donor
+            pool (minus the explained item). Under ``"legacy"`` the donors are
+            the data given to ``fit``.
         y : array-like, shape (n_samples,), default=None
             Target variable.
         set_cols_idx : 1D array-like, default=None
@@ -389,8 +405,10 @@ class ShaRP(BaseEstimator):
             feature importance.
         coalition_size : int, default=n_features-1
             Maximum number of features used during the construction of composite points.
-        sample_size : int, default=n_samples
+        sample_size : int, default=None
             Maximum number of samples used during the construction of composite points.
+            Default: ``self.sample_size``; if that is None, all donors (under
+            ``semantics="paper"``, the pool after excluding the explained item).
 
         Returns
         -------
@@ -416,6 +434,8 @@ class ShaRP(BaseEstimator):
 
         requested_size = kwargs.get("sample_size", self.sample_size)
 
+        # paper: donors are the X passed here (spec 4.1); legacy: the fitted data
+        pool_X = X_ if self.semantics == "paper" else self.qoi_.X
         idx_samples = range(X_.shape[0])
         idx_cols = range(X_.shape[1])
 
@@ -426,7 +446,7 @@ class ShaRP(BaseEstimator):
             sample_col_idx = tasks[task]
             row = X_[sample_col_idx[0]]
             pool, exclude, sample_size = self._donors(
-                self.qoi_.X, row, requested_size, X_.shape[0]
+                pool_X, row, requested_size, X_.shape[0]
             )
             return (
                 sample_col_idx,
@@ -440,7 +460,7 @@ class ShaRP(BaseEstimator):
                     coalition_size=coalition_size,
                     replace=self.replace,
                     rng=rngs(task),
-                    exclude=exclude,
+                    **_exclude_kw(exclude),
                 ),
             )
 
@@ -476,8 +496,10 @@ class ShaRP(BaseEstimator):
             feature importance.
         coalition_size : int, default=n_features-1
             Maximum number of features used during the construction of composite points.
-        sample_size : int, default=n_samples
+        sample_size : int, default=None
             Maximum number of samples used during the construction of composite points.
+            Default: ``self.sample_size``; if that is None, all donors (under
+            ``semantics="paper"``, the pool after excluding the explained item).
 
         Returns
         -------
@@ -545,8 +567,10 @@ class ShaRP(BaseEstimator):
             feature importance.
         coalition_size : int, default=n_features-1
             Maximum number of features used during the construction of composite points.
-        sample_size : int, default=n_samples
+        sample_size : int, default=None
             Maximum number of samples used during the construction of composite points.
+            Default: ``self.sample_size``; if that is None, all donors (under
+            ``semantics="paper"``, the pool after excluding the explained item).
 
         Returns
         -------

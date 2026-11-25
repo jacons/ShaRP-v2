@@ -47,6 +47,10 @@ def check_measure(measure):
     if measure is None:
         return MEASURES["shapley"]
     elif isinstance(measure, str):
+        if measure not in MEASURES:
+            raise ValueError(
+                f"Unknown measure {measure!r}; valid names: {sorted(MEASURES)}."
+            )
         return MEASURES[measure]
     else:
         return measure
