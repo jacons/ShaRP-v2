@@ -373,6 +373,9 @@ class ShaRP(BaseEstimator):
         array-like, shape (n_samples, n_features)
             Contribution of each feature to a point's qoi
         """
+        if X is None:
+            X = self.qoi_.X
+
         X_, y_ = check_inputs(X, y)
 
         if "set_cols_idx" in kwargs.keys():
@@ -457,10 +460,10 @@ class ShaRP(BaseEstimator):
         if "X" in kwargs.keys():
             X = kwargs.pop("X")
 
-            if type(sample1) in [int, list]:
+            if isinstance(sample1, (numbers.Integral, list)):
                 sample1 = X[sample1]
 
-            if type(sample2) in [int, list]:
+            if isinstance(sample2, (numbers.Integral, list)):
                 sample2 = X[sample2]
 
         sample1 = np.asarray(sample1)
@@ -468,7 +471,7 @@ class ShaRP(BaseEstimator):
         sample2 = sample2.reshape(1, -1) if sample2.ndim == 1 else sample2
 
         if "sample_size" in kwargs.keys():
-            sample_size = kwargs["sample_size"]
+            sample_size = kwargs.pop("sample_size")
         elif self.sample_size is not None:
             sample_size = (
                 sample2.shape[0]
@@ -479,7 +482,7 @@ class ShaRP(BaseEstimator):
             sample_size = sample2.shape[0]
 
         if "coalition_size" in kwargs.keys():
-            coalition_size = kwargs["coalition_size"]
+            coalition_size = kwargs.pop("coalition_size")
         elif self.coalition_size is not None:
             coalition_size = self.coalition_size
         else:

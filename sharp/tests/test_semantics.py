@@ -55,3 +55,22 @@ def test_legacy_index_uses_sorted_X():
         int(np.argmin(f(X))), X
     )
     np.testing.assert_allclose(a, b, atol=1e-12)
+
+
+def test_pairwise_numpy_integer_indices():
+    X, f = DATASETS["gauss3"]
+    a = _fit(f, X).pairwise(2, 3, X=X)
+    b = _fit(f, X).pairwise(np.int64(2), np.int64(3), X=X)
+    np.testing.assert_allclose(b, a)
+
+
+def test_pairwise_caller_sample_and_coalition_size():
+    X, f = DATASETS["gauss3"]
+    out = _fit(f, X).pairwise(X[2], X[5:10], sample_size=3, coalition_size=1)
+    assert out.shape == (3,)
+
+
+def test_all_default_X():
+    X, f = DATASETS["gauss3"]
+    xai = _fit(f, X, sample_size=None)
+    np.testing.assert_allclose(xai.all(), xai.all(X))
