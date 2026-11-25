@@ -35,11 +35,10 @@ class ShaRP(BaseEstimator):
     ShaRP extends the Quantitative Input Influence (QII) framework to compute feature
     contributions to multiple ranking-specific Quantities of Interest (QoIs).
     These QoIs include:
-    - Score: Contribution of features to an item's score.
     - Rank: Impact of features on an item's rank.
     - Top-k: Influence of features on whether an item appears in the top-k positions.
-    - Pairwise Preference: Contribution of features to the relative order between
-    two items.
+    - Rank score: Contribution of features to an item's score.
+    - Pairwise preference: obtained by calling :meth:`pairwise` with two items.
 
     ShaRP uses Shapley values, a cooperative game theory concept, to distribute
     the "value" of a ranked outcome among the features. For each QoI, the class:
@@ -53,19 +52,18 @@ class ShaRP(BaseEstimator):
 
     Parameters
     ----------
-    qoi : str, optional
-        The quantity of interest to compute feature contributions for. Options include:
-        - "score" : Contribution to an item's score.
+    qoi : str or QoI object, optional
+        The quantity of interest to compute feature contributions for. Options:
         - "rank" : Contribution to an item's rank.
-        - "top-k" : Contribution to whether an item appears in the top-k.
-        - "pairwise" : Contribution to the relative order between two items.
-        By default, in method ``fit()``, "rank" will be used.
-        If QoI is None, ``target_function`` and parameters ``X`` and ``y``
-        need to be passed.
+        - "top_k" : Contribution to whether an item appears in the top-k
+          (``top_k`` can be passed as an extra keyword argument, default 10).
+        - "rank_score" : Contribution to an item's score.
+        - a QoI object (see :mod:`sharp.qoi`), used as is.
+        If None, "rank" is used in ``fit()``.
 
-    target_function : function, optional
-        A custom function defining the outcome of interest for the data.
-        Ignored if `qoi` is specified.
+    target_function : function
+        Function mapping an array of shape (n_samples, n_features) to a 1D array of
+        scores. Required when ``qoi`` is a string.
 
     measure : str, default="shapley"
         The method used to compute feature contributions. Options include
@@ -73,20 +71,35 @@ class ShaRP(BaseEstimator):
 
     sample_size : int, optional
         The number of perturbations to apply per data point when calculating
-        feature importance. Default is `None`, which uses all available samples.
+        feature importance. Default is `None`, which uses all available samples
+        (under ``semantics="paper"``, all donors left after removing the explained
+        item).
 
     coalition_size : int, optional
         The maximum size of feature coalitions to consider. Default is `None`,
-        which uses all features except one.
+        which uses all features except one. A smaller value is an approximation:
+        the Shapley weights are not renormalized over the coalitions that are kept,
+        so the efficiency property (contributions summing to the QoI difference)
+        does not hold.
 
     replace : bool, default=False
         Whether to sample feature values with replacement during perturbation.
 
     semantics : {"paper", "legacy"}, default="paper"
         ``"paper"`` follows the ShaRP paper: the explained item is removed from the
-        donor pool (and from the ranking reference), integer indices refer to the
-        row order of the data passed by the user, and ``sample_size=None`` uses the
-        whole pool. ``"legacy"`` reproduces the behaviour of earlier versions.
+        donor pool (one occurrence, if present) and from the ranking reference, the
+        hybrid's rank is a competition rank (1 + number of reference items with a
+        strictly higher score), and ``sample_size=None`` uses the whole pool.
+        Integer indices (``individual(3)``) refer to the row order of the data as
+        passed by the user. ``"legacy"`` reproduces the behaviour of earlier
+        versions: no exclusion, rank = number of reference items with score >= the
+        hybrid's, and, because the reference data is sorted by score, integer indices
+        refer to the score-sorted order.
+
+        Under ``"paper"`` every (item, feature) task draws from its own seed derived
+        from ``random_state``, so results do not depend on ``n_jobs``. Under
+        ``"legacy"`` all tasks share one generator and ``n_jobs>1`` keeps the old
+        behaviour, so results can differ from ``n_jobs=1``.
 
     random_state : int, RandomState instance, or None, optional
         Seed or random number generator for reproducibility. Default is `None`.
@@ -110,7 +123,7 @@ class ShaRP(BaseEstimator):
     References
     ----------
     .. [1] V. Pliatsika, J. Fonseca, T. Wang, J. Stoyanovich, "ShaRP: Explaining
-       Rankings with Shapley Values", Under submission.
+       Rankings with Shapley Values", arXiv:2401.16744.
     """
 
     def __init__(
@@ -216,7 +229,6 @@ class ShaRP(BaseEstimator):
         """
         Provides an explanation for individual sample point based on reference dataset
 
-
         Parameters
         ----------
         sample : array-like, shape (n_features,) or int
@@ -293,7 +305,6 @@ class ShaRP(BaseEstimator):
         Provides an explanation for all sample points for a specified feature
         based on reference dataset
 
-
         Parameters
         ----------
         feature : str or int
@@ -364,7 +375,6 @@ class ShaRP(BaseEstimator):
     def all(self, X=None, y=None, **kwargs):
         """
         Provides an explanation for all sample points based on reference dataset
-
 
         Parameters
         ----------
@@ -450,7 +460,6 @@ class ShaRP(BaseEstimator):
         Compare two samples, or one sample against a set of samples.
         If `sample1` or `sample2` are of type `int` or `list`, `X` also needs
         to be passed.
-
 
         Parameters
         ----------

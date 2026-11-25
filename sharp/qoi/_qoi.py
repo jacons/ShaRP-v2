@@ -22,8 +22,9 @@ class RankQoI(BaseRankQoI):
 
 class RankScoreQoI(BaseRankQoI):
     """
-    A general, ranking-oriented QoI, ``target_function`` must
-    output scores.
+    Score QoI. Uses the score given by ``target_function`` as the quantity being
+    measured; the influence is the mean score difference between the two sets of
+    samples. ``X`` is still required, for API consistency with the other QoIs.
 
     Notes
     -----
@@ -102,9 +103,9 @@ def get_qoi(qoi):
 
     Parameters
     ----------
-    qoi : str, callable or None
-        Quantity of interest as string. If callable it is returned as is.
-        If None, returns None.
+    qoi : str or QoI object
+        Quantity of interest as string (one of :func:`get_qoi_names`). Anything
+        else is returned as is.
 
     Returns
     -------
@@ -113,18 +114,16 @@ def get_qoi(qoi):
 
     Notes
     -----
-    When passed a string, this function always returns a copy of the scorer
-    object. Calling `get_qoi` twice for the same scorer results in two
-    separate QoI objects.
+    When passed a string, this function returns a copy of the QoI class
+    (not an instance), so it can be instantiated with the QoI's parameters.
     """
     if isinstance(qoi, str):
         try:
             quantity = copy.deepcopy(_QOI_OBJECTS[qoi])
         except KeyError:
             raise ValueError(
-                "%r is not a valid scoring value. "
-                "Use sklearn.metrics.get_scorer_names() "
-                "to get valid options." % qoi
+                "%r is not a valid QoI name. Valid names are: %s."
+                % (qoi, ", ".join(get_qoi_names()))
             )
     else:
         quantity = qoi

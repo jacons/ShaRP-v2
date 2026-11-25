@@ -41,8 +41,8 @@ def check_inputs(X, y=None):
 
 def check_measure(measure):
     """
-    If None, return a default function. If str, grab function from a dict. if function,
-    check if it's valid and return itself.
+    If None, return the default (Shapley) function. If str, grab it from ``MEASURES``.
+    Otherwise assume a callable and return it as is.
     """
     if measure is None:
         return MEASURES["shapley"]
@@ -52,10 +52,14 @@ def check_measure(measure):
         return measure
 
 
-def check_qoi(qoi, target_function=None, X=None, cache=True, semantics="paper", **kwargs):
+def check_qoi(
+    qoi, target_function=None, X=None, cache=True, semantics="paper", **kwargs
+):
     """
-    If None, return a default function. If str, grab function from a dict. if function,
-    check if it's valid and return itself.
+    Build the QoI object. If ``qoi`` is a str, look it up with ``get_qoi`` and
+    instantiate it (``target_function`` is then required, and ``X`` for rank-based
+    QoIs); otherwise ``qoi`` is used as is. ``semantics`` is set on the QoI and
+    rank-based QoIs sort their reference data.
     """
     # Target function is always required regardless of QoI
     params = {"target_function": target_function, "cache": cache, **kwargs}

@@ -11,25 +11,33 @@ def _marginal(
     row, col_idx, set_cols_idx, X, qoi, sample_size, replace, rng, exclude=None, **kwargs
 ):
     """
-    Calculates the marginal QII for a single or set of attributes in a single row.
+    Marginal QII of one feature of one row, for a given coalition of other features.
 
     Parameters
     ----------
-      row [pandas.series]:
-          The dataframe row we are explaining.
-      column [str]:
-          The column we are explaining.
-      set_columns [str, list]:
-          The attribute (list) that we are going to use for the marginal.
-      dataset [pandas.dataframe]:
-          The dataset to use in order to test the classifier.
-      classifier [function]:
-          The machine learning model we used to predict the data.
-      sample_size [int], default=30:
-          how many times we calculate the QII.
-      return [int]:
-          the QII score of the attribute,
-          -- how this attribute contribute to the machine.
+    row : np.ndarray of shape (n_features,)
+        The item being explained.
+    col_idx : int
+        Index of the feature being explained.
+    set_cols_idx : sequence of int
+        Indices of the features in the coalition.
+    X : np.ndarray of shape (n_donors, n_features)
+        Donor pool the hybrid values are drawn from.
+    qoi : BaseQoI
+        Quantity of interest; ``qoi.calculate`` scores the two hybrid sets.
+    sample_size : int
+        Number of donors drawn.
+    replace : bool
+        Whether donors are drawn with replacement.
+    rng : np.random.RandomState
+        Random number generator.
+    exclude : np.ndarray, default=None
+        The explained item, forwarded to ``qoi.calculate`` (see ``BaseRankQoI.rank``).
+
+    Returns
+    -------
+    float
+        Marginal influence of ``col_idx`` given the coalition.
     """
     # Draw new samples uniformly at random
     X_sampled = X[rng.choice(np.arange(X.shape[0]), size=sample_size, replace=replace)]
@@ -63,26 +71,22 @@ def _shapley(
     **kwargs,
 ):
     """
-    Calculates the Shapley for a single attribute of a single row.
+    Shapley value of one feature of one row, averaging marginal QII over coalitions
+    of the other features of size ``0..coalition_size``.
 
     Parameters
     ----------
-      row [pandas.series]:
-          The dataframe row we are explaining.
-      dataset [pandas.dataframe]:
-          The dataset to use in order to test the classifier.
-      target [str]:
-          The feature we are explaining
-      model [function]:
-          The machine learning model we used to predict the data.
-      random_state [int]:
-          Random state seed.
-      iterate_time [int], default=30:
-          how many times we calculate the marginal per coalition.
+    row, col_idx, X, qoi, sample_size, replace, rng, exclude
+        As in :func:`_marginal`.
+    coalition_size : int
+        Largest coalition size considered. Weights are not renormalized, so if
+        smaller than ``n_features - 1`` the result is an approximation for which
+        efficiency does not hold.
 
-      return [int]:
-          the Shapley score of the attribute for the feature,
-          -- how this attribute contributes to the feature's prediction.
+    Returns
+    -------
+    float
+        Shapley value of ``col_idx``.
     """
 
     # Get indices for all columns except the one being explained

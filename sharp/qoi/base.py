@@ -27,8 +27,7 @@ class TargetFunctionWrapper:
 
 class BaseQoI(BaseEstimator, metaclass=ABCMeta):
     """
-    Base class to implement Quantities of Interest (QoI) for classification or regression
-    tasks. It should not be used directly. Any QoI must define at least 2 functions:
+    Base class to implement Quantities of Interest (QoI). It should not be used directly. Any QoI must define at least 2 functions:
 
       :func:`qoi.estimate`:
           A function that predicts the model's result for one or multiple items.
@@ -39,9 +38,18 @@ class BaseQoI(BaseEstimator, metaclass=ABCMeta):
     Parameters
     ----------
     target_function : function
-        Method used to predict a label or score. The output of this function
-        should be a 1-dimensional array with the expected target (i.e., label or score)
-        for each of the passed observations.
+        Method used to calculate a score. The output of this function
+        should be a 1-dimensional array with one score for each of the passed
+        observations.
+
+    X : array-like of shape (n_samples, n_features), default=None
+        Reference dataset (required by rank-based QoIs).
+
+    cache : bool, default=True
+        Whether to cache ``target_function`` outputs, keyed by row values.
+
+    semantics : {"paper", "legacy"}, default="paper"
+        See :class:`sharp.ShaRP`.
     """
 
     _qoi_type = "score"
@@ -63,10 +71,14 @@ class BaseQoI(BaseEstimator, metaclass=ABCMeta):
         rows : array-like of shape (n_samples, n_features)
             Samples over which ``target_function`` will be applied.
 
+        exclude : array-like of shape (n_features,), default=None
+            The explained item; only used by rank-based QoIs (see
+            :meth:`BaseRankQoI.rank`).
+
         Returns
         -------
         target_output : np.ndarray of shape (n_samples,)
-            Label predictions or score estimations.
+            Score or rank estimations.
         """
         return self._estimate(rows, exclude)
 
@@ -82,6 +94,9 @@ class BaseQoI(BaseEstimator, metaclass=ABCMeta):
 
         rows2 : array-like of shape (n_samples, n_features)
             Second set of samples to compare.
+
+        exclude : array-like of shape (n_features,), default=None
+            The explained item; only used by rank-based QoIs.
 
         Returns
         -------
@@ -114,8 +129,8 @@ class BaseRankQoI(BaseQoI, metaclass=ABCMeta):
     ----------
     target_function : function
         Method used to calculate a score. The output of this function
-        should be a 1-dimensional array with the expected target (i.e., label, score, or
-        ranking) for each of the passed observations.
+        should be a 1-dimensional array with one score for each of the passed
+        observations.
 
     X : array-like of shape (n_samples, n_features)
         The input samples.
@@ -142,10 +157,19 @@ class BaseRankQoI(BaseQoI, metaclass=ABCMeta):
         X : array-like of shape (n_samples, n_features)
             The input samples to calculate the rankings for.
 
+        exclude : array-like of shape (n_features,), default=None
+            The explained item v. Only used when ``semantics="paper"``: if ``self.X``
+            contains a row equal to v, v is removed from the reference dataset before
+            ranking. Ignored under ``"legacy"``.
+
         Returns
         -------
         rankings : np.ndarray of shape (n_samples,)
-            Rankings for all samples in ``X``.
+            Rankings for all samples in ``X``. Rank 1 is the highest score.
+            ``"legacy"``: the number of reference items with score >= the sample's
+            (ties share the worst rank; v is counted). ``"paper"``: competition rank,
+            1 + the number of reference items (without v) with score strictly greater
+            than the sample's.
         """
         if self.X is None:
             raise ValueError(

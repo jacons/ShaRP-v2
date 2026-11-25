@@ -1,65 +1,76 @@
-<div align="center">
-    <h1 align="center">ShaRP</h1>
-</div>
-
-<p align="center">
-<a href="https://github.com/DataResponsibly/ShaRP/actions/workflows/ci.yml"><img alt="Github Actions" src="https://github.com/DataResponsibly/ShaRP/actions/workflows/ci.yml/badge.svg"></a>
-<a href="https://dataresponsibly.github.io/ShaRP/"><img alt="Documentation Status" src="https://github.com/DataResponsibly/ShaRP/actions/workflows/deploy-docs.yml/badge.svg"></a>
-<a href="https://github.com/psf/black"><img alt="Black" src="https://img.shields.io/badge/code%20style-black-000000.svg"></a>
-<a href="https://img.shields.io/badge/python-3.10%20|%203.11%20|%203.12%20|%203.13-blue"><img alt="Python Versions" src="https://img.shields.io/badge/python-3.10%20|%203.11%20|%203.12%20|%203.13-blue"></a>
-<a href="https://badge.fury.io/py/xai-sharp"><img alt="Pypi Version" src="https://badge.fury.io/py/xai-sharp.svg"></a>
-<a href="https://pepy.tech/project/xai-sharp"><img alt="Downloads" src="https://static.pepy.tech/personalized-badge/xai-sharp?period=total&units=international_system&left_color=grey&right_color=brightgreen&left_text=downloads"></a>
-<a href="https://doi.org/10.48550/arXiv.2401.16744"><img alt="DOI" src="https://zenodo.org/badge/DOI/10.48550/arXiv.2401.16744.svg"></a>
+# ShaRP
 
 ``ShaRP`` is an open source library with the implementation of the ShaRP
 algorithm (Shapley for Rankings and Preferences), a framework that can be used
 to explain the contributions of features to different aspects of a ranked
-outcome, based on Shapley values.
+outcome (rank, top-k membership, score, pairwise preference), based on Shapley
+values.
 
 ## Installation
 
-A Python distribution of version >= 3.10 is required to run this
-project. ``ShaRP`` requires:
+Python >= 3.10 is required. Runtime dependencies: numpy (>= 1.24),
+scikit-learn (>= 1.2.0) and tqdm (>= 4.46.0).
 
-- numpy (>= 1.20.0)
-- pandas (>= 1.3.5)
-- scikit-learn (>= 1.2.0)
-- ml-research (>= 0.4.2)
-
-Some functions require Matplotlib (>= 2.2.3) for plotting.
-
-### User Installation
-
-The easiest way to install ``sharp`` is using ``pip`` :
-
-    # Install latest release
-    pip install -U xai-sharp
-
-    # Install additional dependencies (matplotlib) for plotting
-    pip install -U "xai-sharp[optional]"
-
-    # Install unreleased version (may be unstable)
-    pip install -U git+https://github.com/DataResponsibly/ShaRP
-
-
-Installation instruction can also be found in the [documentation pages](https://dataresponsibly.github.io/ShaRP/).
-
-### Installing from source
-
-The following commands should allow you to setup the development version of the
-project with minimal effort:
-
-    # Clone the project.
     git clone https://github.com/DataResponsibly/sharp.git
     cd sharp
+    pip install .
 
-    # Create and activate an environment 
-    make environment 
-    conda activate sharp # Assuming you are have conda set up
+## Minimal example
 
-    # Install project requirements and the research package. Dependecy group
-    # "all" will also install the dependency groups shown below.
-    pip install ".[optional,tests,docs]"
+```python
+import numpy as np
+from sharp import ShaRP
+
+rng = np.random.RandomState(0)
+X = rng.rand(50, 3)
+weights = np.array([0.6, 0.3, 0.1])
+
+
+def f(rows):
+    return np.asarray(rows, dtype=float) @ weights  # higher score = better rank
+
+
+sharp = ShaRP(qoi="rank", target_function=f, random_state=0)
+sharp.fit(X)
+
+print(sharp.individual(0))    # contribution of each feature to item 0's rank
+print(sharp.all(X).shape)     # (50, 3): one row of contributions per item
+```
+
+Other QoIs are ``"top_k"`` (with ``top_k=10`` as extra keyword) and
+``"rank_score"``. ``pairwise``, ``pairwise_set`` and ``feature`` explain
+comparisons between items and a single feature averaged over items.
+
+## Semantics
+
+``ShaRP(..., semantics="paper")`` (default) follows the paper; ``"legacy"``
+reproduces the behaviour of earlier versions.
+
+|                         | ``legacy``                                        | ``paper``                                                                                                |
+|-------------------------|---------------------------------------------------|----------------------------------------------------------------------------------------------------------|
+| Rank of hybrid item u   | #{d in D : f(d) >= f(u)}                          | 1 + #{d in D \ {v} : f(d) > f(u)} (competition ranking, as in the paper's notebook)                     |
+| Donor pool              | all of X                                          | X without **one** occurrence of v                                                                        |
+| Top-k                   | legacy rank <= k                                  | paper rank <= k                                                                                          |
+| Integer indices         | refer to the score-sorted reference data          | refer to the rows in the order passed by the user                                                        |
+| Randomness with n_jobs  | shared generator; ``n_jobs>1`` can change results | one seed per (item, feature) task; results do not depend on ``n_jobs``                                   |
+
+The explained item v is the ``sample`` in ``individual``/``pairwise`` and the
+row in ``all``/``feature``.
+
+**Two distinct sets.** The paper has a dataset D, over which the rank is
+computed, and a reference set D', from which donors are drawn. In the code they
+are the data given to ``fit`` and the ``X`` passed to the method (``sample2`` in
+``pairwise``). Under ``paper`` the rule is applied to each set independently: if
+the set contains a row exactly equal to v, its first occurrence is removed;
+otherwise nothing is removed. For example, in ``pairwise(X[a], X[b])`` v = X[a]
+is removed from the ranking set (it is in the ``fit`` data) while the donor pool
+``{X[b]}`` is left untouched; in ``individual(row, X_other)`` v is removed from
+the ``fit`` data and from ``X_other``, if present in them.
+
+Under ``paper``, ``sample_size=None`` means the whole pool after the removal;
+a ``sample_size`` larger than the pool, without ``replace``, is capped at the
+pool size. ``coalition_size`` smaller than ``n_features - 1`` is an
+approximation: weights are not renormalized, so efficiency does not hold.
 
 ## Citing ShaRP
 
