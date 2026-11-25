@@ -201,6 +201,14 @@ class ShaRP(BaseEstimator):
             sample_size = min(sample_size, len(pool))
         return pool, row, sample_size
 
+    def _task_rngs(self, n_tasks, seed=None):
+        """One rng per task: the shared one (legacy) or independent seeded ones (paper)."""
+        if self.semantics == "legacy":
+            return [self._rng] * n_tasks
+        rng = self._rng if seed is None else np.random.RandomState(seed)
+        seeds = rng.randint(np.iinfo(np.int32).max, size=n_tasks)
+        return [np.random.RandomState(s) for s in seeds]
+
     def individual(self, sample, X=None, y=None, **kwargs):
         """
         Provides an explanation for individual sample point based on reference dataset
@@ -255,6 +263,8 @@ class ShaRP(BaseEstimator):
 
         n_jobs = kwargs["n_jobs"] if "n_jobs" in kwargs.keys() else self.n_jobs
         verbosity = kwargs["verbose"] if "verbose" in kwargs.keys() else self.verbose
+        n_features = len(self.feature_names_)
+        rngs = self._task_rngs(n_features, kwargs.get("_seed"))
         influences = parallel_loop(
             lambda col_idx: self.measure_(
                 row=sample,
@@ -265,10 +275,10 @@ class ShaRP(BaseEstimator):
                 sample_size=sample_size,
                 coalition_size=coalition_size,
                 replace=self.replace,
-                rng=self._rng,
+                rng=rngs[col_idx],
                 exclude=exclude,
             ),
-            range(len(self.feature_names_)),
+            range(n_features),
             n_jobs=n_jobs,
             progress_bar=verbosity,
         )
@@ -326,6 +336,7 @@ class ShaRP(BaseEstimator):
         requested_size = kwargs.get("sample_size", self.sample_size)
 
         influences = []
+        rngs = self._task_rngs(X_.shape[0])
         for sample_idx in range(X_.shape[0]):
             sample = X_[sample_idx]
             pool, exclude, sample_size = self._donors(
@@ -340,7 +351,7 @@ class ShaRP(BaseEstimator):
                 sample_size=sample_size,
                 coalition_size=coalition_size,
                 replace=self.replace,
-                rng=self._rng,
+                rng=rngs[sample_idx],
                 exclude=exclude,
             )
             influences.append(cell_influence)
@@ -395,7 +406,11 @@ class ShaRP(BaseEstimator):
         idx_samples = range(X_.shape[0])
         idx_cols = range(X_.shape[1])
 
-        def contribution(sample_col_idx):
+        tasks = list(product(idx_samples, idx_cols))
+        rngs = self._task_rngs(len(tasks))
+
+        def contribution(task):
+            sample_col_idx = tasks[task]
             row = X_[sample_col_idx[0]]
             pool, exclude, sample_size = self._donors(
                 self.qoi_.X, row, requested_size, X_.shape[0]
@@ -411,14 +426,14 @@ class ShaRP(BaseEstimator):
                     sample_size=sample_size,
                     coalition_size=coalition_size,
                     replace=self.replace,
-                    rng=self._rng,
+                    rng=rngs[task],
                     exclude=exclude,
                 ),
             )
 
         influences = parallel_loop(
             contribution,
-            list(product(idx_samples, idx_cols)),
+            range(len(tasks)),
             n_jobs=self.n_jobs,
             progress_bar=self.verbose,
         )
@@ -527,9 +542,15 @@ class ShaRP(BaseEstimator):
             Contributions for each sample from `samples1` against respective sample in
              `samples2`
         """
+        pairs = list(zip(samples1, samples2))
+        if self.semantics == "legacy":
+            seed_kw = [{}] * len(pairs)
+        else:
+            seeds = self._rng.randint(np.iinfo(np.int32).max, size=len(pairs))
+            seed_kw = [{"_seed": int(sd)} for sd in seeds]
         contributions = parallel_loop(
-            lambda samples: self.pairwise(*samples, verbose=False, **kwargs),
-            zip(samples1, samples2),
+            lambda t: self.pairwise(*pairs[t], verbose=False, **kwargs, **seed_kw[t]),
+            range(len(pairs)),
             n_jobs=self.n_jobs,
             progress_bar=self.verbose,
         )
