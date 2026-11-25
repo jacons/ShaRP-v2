@@ -7,7 +7,9 @@ from math import comb
 from itertools import combinations
 
 
-def _marginal(row, col_idx, set_cols_idx, X, qoi, sample_size, replace, rng, **kwargs):
+def _marginal(
+    row, col_idx, set_cols_idx, X, qoi, sample_size, replace, rng, exclude=None, **kwargs
+):
     """
     Calculates the marginal QII for a single or set of attributes in a single row.
 
@@ -45,10 +47,21 @@ def _marginal(row, col_idx, set_cols_idx, X, qoi, sample_size, replace, rng, **k
     X_modded2[:, col_idx] = X_sampled[:, col_idx]
 
     # Return score
-    return qoi.calculate(X_modded1, X_modded2)
+    return qoi.calculate(X_modded1, X_modded2, exclude=exclude)
 
 
-def _shapley(row, col_idx, X, qoi, sample_size, coalition_size, replace, rng, **kwargs):
+def _shapley(
+    row,
+    col_idx,
+    X,
+    qoi,
+    sample_size,
+    coalition_size,
+    replace,
+    rng,
+    exclude=None,
+    **kwargs,
+):
     """
     Calculates the Shapley for a single attribute of a single row.
 
@@ -96,6 +109,7 @@ def _shapley(row, col_idx, X, qoi, sample_size, coalition_size, replace, rng, **
             sample_size=sample_size,
             replace=replace,
             rng=rng,
+            exclude=exclude,
         )
         total_score += score / (comb(X.shape[1] - 1, len(set_cols_idx)) * X.shape[1])
 

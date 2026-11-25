@@ -9,7 +9,7 @@ from numpy.testing import assert_array_equal
 import sharp
 from sharp.tests.make_golden import CASES, DATASETS, run_case
 
-EXTRA: dict = {}
+EXTRA: dict = {"semantics": "legacy"}
 GOLDEN = np.load(os.path.join(os.path.dirname(__file__), "data", "golden_6543226.npz"))
 
 

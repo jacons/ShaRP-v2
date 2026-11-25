@@ -13,11 +13,11 @@ class RankQoI(BaseRankQoI):
     This QoI was formerly defined as ``RankingRank``.
     """
 
-    def _estimate(self, rows):
+    def _estimate(self, rows, exclude=None):
         return self.rank(rows)
 
-    def _calculate(self, rows1, rows2):
-        return (self.estimate(rows2) - self.estimate(rows1)).mean()
+    def _calculate(self, rows1, rows2, exclude=None):
+        return (self.estimate(rows2, exclude) - self.estimate(rows1, exclude)).mean()
 
 
 class RankScoreQoI(BaseRankQoI):
@@ -30,11 +30,11 @@ class RankScoreQoI(BaseRankQoI):
     This QoI was formerly defined as ``RankingScore``.
     """
 
-    def _estimate(self, rows):
+    def _estimate(self, rows, exclude=None):
         return self.target_function(rows)
 
-    def _calculate(self, rows1, rows2):
-        return (self.estimate(rows1) - self.estimate(rows2)).mean()
+    def _calculate(self, rows1, rows2, exclude=None):
+        return (self.estimate(rows1, exclude) - self.estimate(rows2, exclude)).mean()
 
 
 class TopKQoI(BaseRankQoI):
@@ -48,16 +48,20 @@ class TopKQoI(BaseRankQoI):
         The number of items to consider as part of the top-ranked group.
     """
 
-    def __init__(self, target_function=None, top_k=10, X=None, cache=True):
-        super().__init__(target_function=target_function, X=X, cache=cache)
+    def __init__(
+        self, target_function=None, top_k=10, X=None, cache=True, semantics="paper"
+    ):
+        super().__init__(
+            target_function=target_function, X=X, cache=cache, semantics=semantics
+        )
         self.top_k = top_k
 
-    def _estimate(self, rows):
+    def _estimate(self, rows, exclude=None):
         ranks = self.rank(rows)
         return (ranks <= self.top_k).astype(int)
 
-    def _calculate(self, rows1, rows2):
-        return (self.estimate(rows1) - self.estimate(rows2)).mean()
+    def _calculate(self, rows1, rows2, exclude=None):
+        return (self.estimate(rows1, exclude) - self.estimate(rows2, exclude)).mean()
 
 
 _QOI_OBJECTS = {

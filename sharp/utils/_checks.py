@@ -52,7 +52,7 @@ def check_measure(measure):
         return measure
 
 
-def check_qoi(qoi, target_function=None, X=None, cache=True, **kwargs):
+def check_qoi(qoi, target_function=None, X=None, cache=True, semantics="paper", **kwargs):
     """
     If None, return a default function. If str, grab function from a dict. if function,
     check if it's valid and return itself.
@@ -77,6 +77,8 @@ def check_qoi(qoi, target_function=None, X=None, cache=True, **kwargs):
 
     if define_qoi:
         qoi = get_qoi(qoi)(**params)
+
+    qoi.semantics = semantics
 
     if qoi._qoi_type == "rank":
         qoi.sort_base()

@@ -46,14 +46,15 @@ class BaseQoI(BaseEstimator, metaclass=ABCMeta):
 
     _qoi_type = "score"
 
-    def __init__(self, target_function=None, X=None, cache=True):
+    def __init__(self, target_function=None, X=None, cache=True, semantics="paper"):
         self.target_function = (
             TargetFunctionWrapper(target_function) if cache else target_function
         )
         self.cache = cache
         self.X = X
+        self.semantics = semantics
 
-    def estimate(self, rows):
+    def estimate(self, rows, exclude=None):
         """
         Prepares and runs ``self.target_function`` for a set of samples.
 
@@ -67,9 +68,9 @@ class BaseQoI(BaseEstimator, metaclass=ABCMeta):
         target_output : np.ndarray of shape (n_samples,)
             Label predictions or score estimations.
         """
-        return self._estimate(rows)
+        return self._estimate(rows, exclude)
 
-    def calculate(self, rows1, rows2):
+    def calculate(self, rows1, rows2, exclude=None):
         """
         Calculates the influence score based on the ``target_function`` outputs for
         ``rows1`` and ``rows2``.
@@ -87,14 +88,14 @@ class BaseQoI(BaseEstimator, metaclass=ABCMeta):
         influence_score : float
             Influence score for ``rows1``, compared to ``rows2``.
         """
-        return self._calculate(rows1, rows2)
+        return self._calculate(rows1, rows2, exclude)
 
     @abstractmethod
-    def _estimate(self, rows):
+    def _estimate(self, rows, exclude=None):
         pass
 
     @abstractmethod
-    def _calculate(self, rows1, rows2):
+    def _calculate(self, rows1, rows2, exclude=None):
         pass
 
 
@@ -124,8 +125,11 @@ class BaseRankQoI(BaseQoI, metaclass=ABCMeta):
     _X_sorted = False
 
     def sort_base(self):
-        idx_sorted = np.argsort(self.target_function(self.X))
-        self.X = self.X[idx_sorted]
+        scores = self.target_function(self.X)
+        idx_sorted = np.argsort(scores)
+        if self.semantics == "legacy":
+            self.X = self.X[idx_sorted]
+        self._scores_sorted = scores[idx_sorted]
         self._X_sorted = True
         return self
 
@@ -151,9 +155,6 @@ class BaseRankQoI(BaseQoI, metaclass=ABCMeta):
         if not self._X_sorted:
             self.sort_base()
 
-        if not hasattr(self, "_scores_base"):
-            self._scores_base = self.target_function(self.X)
-
-        scores_base = self._scores_base
+        scores_base = self._scores_sorted
         scores = self.target_function(X)
         return scores_base.shape[0] - np.searchsorted(scores_base, scores, side="left")

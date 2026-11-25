@@ -38,6 +38,7 @@ def test_explain_all_rank_str_qoi(qoi, measure):
         target_function=score_function,
         measure=measure,
         random_state=RNG_SEED,
+        semantics="legacy",
     )
     xai.fit(X)
     contributions = xai.all(X)
@@ -56,6 +57,7 @@ def test_explain_all_rank_obj_qoi(qoi, measure):
         qoi=qoi,
         measure=measure,
         random_state=RNG_SEED,
+        semantics="legacy",
     )
     xai.fit(X)
     contributions = xai.all(X)

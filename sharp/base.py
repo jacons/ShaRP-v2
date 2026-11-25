@@ -16,6 +16,12 @@ from .utils import (
 )
 
 
+def _drop_row(X, row):
+    """Remove the first row of ``X`` exactly equal to ``row``; ``X`` if none."""
+    match = (X == row).all(axis=1)
+    return np.delete(X, match.argmax(), axis=0) if match.any() else X
+
+
 class ShaRP(BaseEstimator):
     """
     The ShaRP (Shapley for Rankings and Preferences) class provides a novel framework
@@ -76,6 +82,12 @@ class ShaRP(BaseEstimator):
     replace : bool, default=False
         Whether to sample feature values with replacement during perturbation.
 
+    semantics : {"paper", "legacy"}, default="paper"
+        ``"paper"`` follows the ShaRP paper: the explained item is removed from the
+        donor pool (and from the ranking reference), integer indices refer to the
+        row order of the data passed by the user, and ``sample_size=None`` uses the
+        whole pool. ``"legacy"`` reproduces the behaviour of earlier versions.
+
     random_state : int, RandomState instance, or None, optional
         Seed or random number generator for reproducibility. Default is `None`.
 
@@ -109,6 +121,7 @@ class ShaRP(BaseEstimator):
         sample_size=None,
         coalition_size=None,
         replace=False,
+        semantics="paper",
         random_state=None,
         cache=True,
         n_jobs=1,
@@ -121,6 +134,7 @@ class ShaRP(BaseEstimator):
         self.sample_size = sample_size
         self.coalition_size = coalition_size
         self.replace = replace
+        self.semantics = semantics
         self.random_state = random_state
         self.cache = cache
         self.n_jobs = n_jobs
@@ -149,6 +163,11 @@ class ShaRP(BaseEstimator):
         feature_names: array-like, shape (n_features,), default=None
             Names of features in X.
         """
+        if self.semantics not in ("paper", "legacy"):
+            raise ValueError(
+                f"semantics must be 'paper' or 'legacy', got {self.semantics!r}."
+            )
+
         X_, y_ = check_inputs(X, y)
 
         self._X = X_
@@ -163,12 +182,24 @@ class ShaRP(BaseEstimator):
             target_function=self.target_function,
             X=X_,
             cache=self.cache,
+            semantics=self.semantics,
             **self.qoi_kwargs,
         )
 
         self.feature_names_ = check_feature_names(X, feature_names=feature_names)
 
         self.measure_ = check_measure(self.measure)
+
+    def _donors(self, pool, row, sample_size, n_default):
+        """Donor pool, row to exclude from rank references, and sample size."""
+        if self.semantics == "legacy":
+            return pool, None, n_default if sample_size is None else sample_size
+        pool = _drop_row(pool, row)
+        if sample_size is None:
+            sample_size = len(pool)
+        elif not self.replace:
+            sample_size = min(sample_size, len(pool))
+        return pool, row, sample_size
 
     def individual(self, sample, X=None, y=None, **kwargs):
         """
@@ -219,12 +250,8 @@ class ShaRP(BaseEstimator):
         else:
             sample = np.asarray(sample)
 
-        if "sample_size" in kwargs.keys():
-            sample_size = kwargs["sample_size"]
-        elif self.sample_size is not None:
-            sample_size = self.sample_size
-        else:
-            sample_size = X_.shape[0]
+        sample_size = kwargs.get("sample_size", self.sample_size)
+        pool, exclude, sample_size = self._donors(X_, sample, sample_size, X_.shape[0])
 
         n_jobs = kwargs["n_jobs"] if "n_jobs" in kwargs.keys() else self.n_jobs
         verbosity = kwargs["verbose"] if "verbose" in kwargs.keys() else self.verbose
@@ -233,12 +260,13 @@ class ShaRP(BaseEstimator):
                 row=sample,
                 col_idx=col_idx,
                 set_cols_idx=set_cols_idx,
-                X=X_,
+                X=pool,
                 qoi=self.qoi_,
                 sample_size=sample_size,
                 coalition_size=coalition_size,
                 replace=self.replace,
                 rng=self._rng,
+                exclude=exclude,
             ),
             range(len(self.feature_names_)),
             n_jobs=n_jobs,
@@ -295,26 +323,25 @@ class ShaRP(BaseEstimator):
         else:
             coalition_size = X_.shape[1] - 1
 
-        if "sample_size" in kwargs.keys():
-            sample_size = kwargs["sample_size"]
-        elif self.sample_size is not None:
-            sample_size = self.sample_size
-        else:
-            sample_size = X_.shape[0]
+        requested_size = kwargs.get("sample_size", self.sample_size)
 
         influences = []
         for sample_idx in range(X_.shape[0]):
             sample = X_[sample_idx]
+            pool, exclude, sample_size = self._donors(
+                X_, sample, requested_size, X_.shape[0]
+            )
             cell_influence = self.measure_(
                 row=sample,
                 col_idx=col_idx,
                 set_cols_idx=set_cols_idx,
-                X=X_,
+                X=pool,
                 qoi=self.qoi_,
                 sample_size=sample_size,
                 coalition_size=coalition_size,
                 replace=self.replace,
                 rng=self._rng,
+                exclude=exclude,
             )
             influences.append(cell_influence)
 
@@ -346,7 +373,6 @@ class ShaRP(BaseEstimator):
         array-like, shape (n_samples, n_features)
             Contribution of each feature to a point's qoi
         """
-
         X_, y_ = check_inputs(X, y)
 
         if "set_cols_idx" in kwargs.keys():
@@ -361,31 +387,34 @@ class ShaRP(BaseEstimator):
         else:
             coalition_size = X_.shape[-1] - 1
 
-        if "sample_size" in kwargs.keys():
-            sample_size = kwargs["sample_size"]
-        elif self.sample_size is not None:
-            sample_size = self.sample_size
-        else:
-            sample_size = X_.shape[0]
+        requested_size = kwargs.get("sample_size", self.sample_size)
 
         idx_samples = range(X_.shape[0])
         idx_cols = range(X_.shape[1])
 
-        influences = parallel_loop(
-            lambda sample_col_idx: (
+        def contribution(sample_col_idx):
+            row = X_[sample_col_idx[0]]
+            pool, exclude, sample_size = self._donors(
+                self.qoi_.X, row, requested_size, X_.shape[0]
+            )
+            return (
                 sample_col_idx,
                 self.measure_(
-                    row=X_[sample_col_idx[0]],
+                    row=row,
                     col_idx=sample_col_idx[1],
                     set_cols_idx=set_cols_idx,
-                    X=self.qoi_.X,
+                    X=pool,
                     qoi=self.qoi_,
                     sample_size=sample_size,
                     coalition_size=coalition_size,
                     replace=self.replace,
                     rng=self._rng,
+                    exclude=exclude,
                 ),
-            ),
+            )
+
+        influences = parallel_loop(
+            contribution,
             list(product(idx_samples, idx_cols)),
             n_jobs=self.n_jobs,
             progress_bar=self.verbose,

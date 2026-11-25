@@ -39,7 +39,11 @@ def test_sharp_topk_qoi_with_different_k(top_k):
     )
 
     xai = ShaRP(
-        qoi="top_k", target_function=score_function, random_state=RNG_SEED, top_k=top_k
+        qoi="top_k",
+        target_function=score_function,
+        random_state=RNG_SEED,
+        top_k=top_k,
+        semantics="legacy",
     )
     xai.fit(X)
     contributions = xai.all(X)
